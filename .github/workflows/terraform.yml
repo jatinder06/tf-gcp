@@ -46,7 +46,7 @@ name: 'Terraform'
 
 on:
   push:
-    branches: [ "dev" ]
+    branches: [ "dev", "workflow-dispatch" ]
   pull_request:
 
 permissions:
@@ -62,6 +62,7 @@ jobs:
     defaults:
       run:
         shell: bash
+        working-directory: ./terraform
 
     steps:
     # Checkout the repository to the GitHub Actions runner
@@ -77,6 +78,17 @@ jobs:
     # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
     - name: Terraform Init
       run: terraform init
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }} 
+    - name: Setup terraform variables
+      id: vars
+      run: |-
+        cat > pipeline.auto.tfvars <<EOF
+        region="${{ vars.GCP_REGION }}" 
+        project="${{ vars.GCP_PROJECT }}" 
+        data-project="${{ vars.GCP_DATA_PROJECT }}"
+        EOF
+
 
     # Checks that all Terraform configuration files adhere to a canonical format
     - name: Terraform Format
@@ -85,9 +97,13 @@ jobs:
     # Generates an execution plan for Terraform
     - name: Terraform Plan
       run: terraform plan -input=false
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
 
       # On push to "dev", build or change infrastructure according to Terraform configuration files
       # Note: It is recommended to set up a required "strict" status check in your repository for "Terraform Cloud". See the documentation on "strict" required status checks for more information: https://help.github.com/en/github/administering-a-repository/types-of-required-status-checks
     - name: Terraform Apply
       if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
       run: terraform apply -auto-approve -input=false
+      env:
+        GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
